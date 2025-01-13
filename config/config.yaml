@@ -1,1 +1,156 @@
+# General Configuration
+project_name: "MLOps_Project"
+region: "us-west-2"
+stack_name: "mlops-stack"
+
+# Experiment Configuration
+experiment:
+  experiment_name: "experiment1"
+  timestamp: "2025-01-14"  # You can dynamically update this based on current timestamp in Python
+  experiment_id: "exp_001"  # A unique experiment identifier
+
+# S3 Configuration (Bucket names based on experiment)
+s3:
+  base_bucket: "my-mlops-bucket"  # Base bucket for all experiments
+  raw_data_bucket: "s3://my-mlops-bucket/raw_data"
+  experiment_data_path: "s3://my-mlops-bucket/experiments/{{experiment.experiment_name}}/{{experiment.timestamp}}"
+  preprocessed_data_bucket: "s3://my-mlops-bucket/experiments/{{experiment.experiment_name}}/{{experiment.timestamp}}/preprocessed_data"
+  model_storage_bucket: "s3://my-mlops-bucket/experiments/{{experiment.experiment_name}}/{{experiment.timestamp}}/models"
+  logs_bucket: "s3://my-mlops-bucket/experiments/{{experiment.experiment_name}}/{{experiment.timestamp}}/logs"
+
+# Training Configuration
+training:
+  instance_type: "ml.m5.large"
+  instance_count: 1
+  model_output_path: "{{s3.model_storage_bucket}}"
+  input_data_location: "{{s3.preprocessed_data_bucket}}"
+  output_data_location: "{{s3.model_storage_bucket}}"
+  training_script_path: "s3://my-raw-data-bucket/scripts/train_model.py"
+  hyperparameters:
+    learning_rate: 0.001
+    batch_size: 32
+    epochs: 10
+  sagemaker_execution_role: "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
+
+# Evaluation Configuration
+evaluation:
+  evaluation_script_path: "s3://my-raw-data-bucket/scripts/evaluate_model.py"
+  evaluation_metrics_output: "{{s3.logs_bucket}}/evaluation_metrics"
+  model_path: "{{s3.model_storage_bucket}}/latest_model.tar.gz"
+  test_data_location: "{{s3.preprocessed_data_bucket}}/test_data"
+
+# Preprocessing Configuration
+preprocessing:
+  preprocessing_script_path: "s3://my-raw-data-bucket/scripts/preprocess_data.py"
+  input_data_location: "{{s3.raw_data_bucket}}/raw_data"
+  preprocessed_data_output: "{{s3.preprocessed_data_bucket}}"
+  log_file_path: "{{s3.logs_bucket}}/preprocess_log.txt"
+
+# Deployment Configuration
+deployment:
+  model_deployment_name: "mlops-model-deployment"
+  endpoint_name: "mlops-endpoint"
+  instance_type: "ml.m5.xlarge"
+  initial_instance_count: 1
+  model_path: "{{s3.model_storage_bucket}}/latest_model.tar.gz"
+  sagemaker_execution_role: "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
+  endpoint_script_path: "s3://my-raw-data-bucket/scripts/deploy_model.py"
+
+# Notification Configuration (Optional)
+notifications:
+  slack_webhook_url: "https://hooks.slack.com/services/..."
+  email_recipients:
+    - "team@example.com"
+    - "admin@example.com"
+
+# Logging Configuration
+logging:
+  log_level: "INFO"  # Logging level (DEBUG, INFO, WARN, ERROR)
+  log_retention_days: 7  # How long logs will be retained (in days)
+
+# Resource Tags
+resource_tags:
+  Environment: "Production"  # Environment tag (can also be "Development", "Staging")
+  ExperimentName: "experiment-1"  # Experiment name tag
+
+# Notifications Configuration
+notifications:
+  sns_topic:
+    arn: "arn:aws:sns:<region>:<account-id>:model-training-notifications"  # SNS topic ARN for notifications
+    event_types:
+      - "ModelTrainingSuccess"
+      - "ModelTrainingFailure"
+      - "RetrainingTriggered"
+    email_recipients:
+      - "user@example.com"
+
+# CloudFormation Stack Configuration
+cloudformation:
+  template_file: "infra/cloudformation/generated_pipeline.yaml"
+  capabilities:
+    - "CAPABILITY_NAMED_IAM"
+  parameters:
+    - name: "InstanceType"
+      value: "ml.m5.large"
+    - name: "S3BucketName"
+      value: "{{s3.base_bucket}}"
+    - name: "ModelLocation"
+      value: "{{s3.model_storage_bucket}}"
+    - name: "LambdaFunctionName"
+      value: "mlops-training-function"
+
+# Lambda Functions Configuration
+lambda:
+  functions:
+    - name: "trigger_model_training"
+      description: "Lambda function to trigger SageMaker model training"
+      handler: "trigger_model_training.lambda_handler"
+      runtime: "python3.8"
+      role: "arn:aws:iam::<account-id>:role/SageMakerRole"
+      timeout: 300
+      memory_size: 512
+    - name: "evaluate_model_function"
+      description: "Lambda function to evaluate the trained model"
+      handler: "evaluate_model_function.lambda_handler"
+      runtime: "python3.8"
+      role: "arn:aws:iam::<account-id>:role/SageMakerRole"
+      timeout: 300
+      memory_size: 512
+    - name: "register_model_in_registry"
+      description: "Lambda function to register the model in SageMaker Model Registry"
+      handler: "register_model_in_registry.lambda_handler"
+      runtime: "python3.8"
+      role: "arn:aws:iam::<account-id>:role/SageMakerRole"
+      timeout: 300
+      memory_size: 512
+    - name: "deploy_sagemaker_model"
+      description: "Lambda function to deploy model to SageMaker endpoint"
+      handler: "deploy_sagemaker_model.lambda_handler"
+      runtime: "python3.8"
+      role: "arn:aws:iam::<account-id>:role/SageMakerRole"
+      timeout: 300
+      memory_size: 512
+    - name: "retrain_model_on_new_data"
+      description: "Lambda function to trigger retraining on new S3 data"
+      handler: "retrain_model_on_new_data.lambda_handler"
+      runtime: "python3.8"
+      role: "arn:aws:iam::<account-id>:role/SageMakerRole"
+      timeout: 300
+      memory_size: 512
+
+# EventBridge Rules Configuration
+eventbridge:
+  rules:
+    - name: "ECRImagePushRule"
+      event_pattern:
+        source:
+          - "aws.ecr"
+        detail-type:
+          - "ECR Image Push"
+        resources:
+          - "arn:aws:ecr:<region>:<account-id>:repository/mlops-pipeline-repo"
+      targets:
+        - arn: "arn:aws:lambda:<region>:<account-id>:function:trigger_model_training"
+          id: "StartSageMakerTraining"
+      state: "ENABLED"
 
