@@ -1,1 +1,127 @@
+name: CI/CD Pipeline for MLOps with ECR, Lambda, and SageMaker
+
+# Trigger this workflow when code is pushed to the repository or a pull request is made
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Job for building and pushing the Docker image
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the code from the GitHub repository
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      # Set up Docker Buildx to support multi-platform builds if necessary
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Log in to Amazon ECR using AWS credentials
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build the Docker image and push it to Amazon ECR
+      - name: Build and Push Docker Image to ECR
+        run: |
+          docker build -t ${{ secrets.ECR_REPO_URI }} .
+          docker push ${{ secrets.ECR_REPO_URI }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # Job for triggering model training using Lambda
+  trigger_model_training:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    steps:
+      # Trigger Lambda function to start model training after the Docker image is pushed to ECR
+      - name: Trigger SageMaker Model Training via Lambda
+        run: |
+          aws lambda invoke \
+            --function-name ${{ secrets.LAMBDA_TRIGGER_FUNCTION }} \
+            --payload '{}' \
+            response.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # Job for evaluating model after training completes
+  evaluate_model:
+    runs-on: ubuntu-latest
+    needs: trigger_model_training
+    steps:
+      # Trigger Lambda function to evaluate the trained model
+      - name: Trigger Model Evaluation via Lambda
+        run: |
+          aws lambda invoke \
+            --function-name ${{ secrets.LAMBDA_EVALUATE_FUNCTION }} \
+            --payload '{}' \
+            response.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # Job for registering the model in SageMaker Model Registry if evaluation passes
+  register_model:
+    runs-on: ubuntu-latest
+    needs: evaluate_model
+    if: success()  # Only proceed if evaluation passes
+    steps:
+      # Trigger Lambda function to register the model in SageMaker Model Registry
+      - name: Register Model in SageMaker Model Registry
+        run: |
+          aws lambda invoke \
+            --function-name ${{ secrets.LAMBDA_REGISTER_MODEL_FUNCTION }} \
+            --payload '{}' \
+            response.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # Job for deploying the model to a SageMaker endpoint
+  deploy_model:
+    runs-on: ubuntu-latest
+    needs: register_model
+    if: success()  # Only proceed if registration is successful
+    steps:
+      # Trigger Lambda function to deploy the model to SageMaker endpoint
+      - name: Deploy Model to SageMaker Endpoint
+        run: |
+          aws lambda invoke \
+            --function-name ${{ secrets.LAMBDA_DEPLOY_FUNCTION }} \
+            --payload '{}' \
+            response.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # Job for retraining the model when new data is added to S3
+  retrain_on_new_data:
+    runs-on: ubuntu-latest
+    needs: deploy_model
+    if: success()  # Only proceed if deployment is successful
+    steps:
+      # Trigger Lambda function to retrain the model based on new data in S3
+      - name: Retrain Model on New Data
+        run: |
+          aws lambda invoke \
+            --function-name ${{ secrets.LAMBDA_RETRAIN_FUNCTION }} \
+            --payload '{}' \
+            response.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
 
