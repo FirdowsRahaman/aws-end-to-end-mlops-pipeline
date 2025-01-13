@@ -1,125 +1,191 @@
-stages:
-  # Source stage: Fetches the latest code from GitHub
+version: '1'
+resources:
+  # Stage 1: Fetch code from GitHub repository
   - name: Source
+    description: 'Source - Fetch code from GitHub repository'
     actions:
       - name: GitHubSource
         actionTypeId:
-          category: Source
+          category: Source  # This is a source stage
           owner: ThirdParty
-          provider: GitHub
+          provider: GitHub  # GitHub is the third-party provider
           version: "1"
         configuration:
-          Owner: <Your-GitHub-Username>  # Replace with your GitHub username
-          Repo: <Your-Repository-Name>   # Replace with your GitHub repository name
-          Branch: main  # The branch to track
-          OAuthToken: <GitHub-Access-Token>  # Your GitHub OAuth token
+          Owner: <Your-GitHub-Username>  # GitHub username
+          Repo: <Your-Repository-Name>   # GitHub repository name
+          Branch: main                   # Branch to trigger from
+          OAuthToken: <GitHub-Access-Token>  # GitHub OAuth token for access
         outputArtifacts:
-          - name: SourceCodeOutput  # Output artifact containing the source code
-        runOrder: 1  # Run this action first
+          - name: SourceCodeOutput       # Output artifact containing the code
+        runOrder: 1  # Run order for this action
 
-  # Build stage: Builds the Docker image from the source code
+  # Stage 2: Build Docker image using AWS CodeBuild
   - name: Build
+    description: 'Build - Build the Docker image using AWS CodeBuild'
     actions:
       - name: BuildDockerImage
         actionTypeId:
-          category: Build
+          category: Build  # This is a build stage
           owner: AWS
-          provider: CodeBuild
+          provider: CodeBuild  # AWS CodeBuild is used to build the Docker image
           version: "1"
         inputArtifacts:
-          - name: SourceCodeOutput  # The source code from the Source stage
+          - name: SourceCodeOutput  # Input artifact from the Source stage
         configuration:
-          ProjectName: mlops-docker-build  # The CodeBuild project to build the Docker image
+          ProjectName: mlops-docker-build  # CodeBuild project to build the Docker image
         outputArtifacts:
           - name: DockerImageOutput  # Output artifact containing the Docker image
-        runOrder: 1  # Run this action second
+        runOrder: 1
 
-  # Deploy stage: Pushes the built Docker image to ECR
+  # Stage 3: Push Docker image to ECR
   - name: DeployToECR
+    description: 'Deploy to ECR - Push the Docker image to Amazon ECR'
     actions:
       - name: PushDockerImageToECR
         actionTypeId:
-          category: Deploy
+          category: Deploy  # This is a deployment stage
           owner: AWS
-          provider: CodeDeployToECR
+          provider: CodeDeployToECR  # AWS CodeDeploy to ECR provider
           version: "1"
         inputArtifacts:
-          - name: DockerImageOutput  # The Docker image to be pushed to ECR
+          - name: DockerImageOutput  # Docker image artifact from the Build stage
         configuration:
-          RepositoryName: mlops-pipeline-repo  # The ECR repository name
-          ImageTag: latest  # The tag for the Docker image
-        runOrder: 1  # Run this action third
+          RepositoryName: mlops-pipeline-repo  # ECR repository to push the image
+          ImageTag: latest  # Tag for the Docker image
+        runOrder: 1
 
-  # EventBridge for SageMaker Job Completion: EventBridge triggers the model evaluation after SageMaker job completion
-  - name: SageMakerEventBridgeRule
+  # Stage 4: Trigger SageMaker training job using Lambda after Docker image is pushed to ECR
+  - name: StartSageMakerTraining
+    description: 'Trigger SageMaker model training job based on ECR push'
     actions:
-      - name: EventBridgeTrigger
+      - name: StartTrainingJob
         actionTypeId:
-          category: Invoke
+          category: Invoke  # This is an invoke action
           owner: AWS
-          provider: Lambda
+          provider: Lambda  # Triggering Lambda to start SageMaker training
           version: "1"
         configuration:
-          FunctionName: evaluate_and_deploy  # Lambda function triggered after SageMaker completion
+          FunctionName: trigger_model_training  # Lambda function to start SageMaker training job
         inputArtifacts:
-          - name: SourceCodeOutput  # The input source code artifact for the evaluation
-        runOrder: 1  # Run this action fourth
+          - name: DockerImageOutput  # Docker image to be used for SageMaker training
+        runOrder: 1
 
-  # EvaluateModel stage: Executes Lambda to evaluate the model after training
+  # Stage 5: Evaluate the trained model using Lambda function
   - name: EvaluateModel
+    description: 'Evaluate the trained model'
     actions:
       - name: ModelEvaluationLambda
         actionTypeId:
-          category: Invoke
+          category: Invoke  # Invoke Lambda to evaluate the model after training
           owner: AWS
-          provider: Lambda
+          provider: Lambda  # Lambda provider
           version: "1"
         configuration:
-          FunctionName: evaluate_model_function  # Lambda function to evaluate the model
+          FunctionName: evaluate_model_function  # Lambda function to evaluate the model after training
         inputArtifacts:
-          - name: SourceCodeOutput  # The source code used for evaluation
-        runOrder: 1  # Run this action fifth
+          - name: SourceCodeOutput  # Code and parameters to evaluate the model
+        runOrder: 1
 
-  # Register model stage: Registers the evaluated model in the model registry
+  # Stage 6: Register the model in SageMaker Model Registry
   - name: RegisterModel
+    description: 'Register model in SageMaker Model Registry'
     actions:
       - name: RegisterModelInRegistry
         actionTypeId:
-          category: Invoke
+          category: Invoke  # Invoke Lambda to register the model in the registry
           owner: AWS
-          provider: Lambda
+          provider: Lambda  # Lambda provider
           version: "1"
         configuration:
           FunctionName: register_model_in_registry  # Lambda function to register the model
         inputArtifacts:
-          - name: SourceCodeOutput  # The source code that contains the model details
-        runOrder: 1  # Run this action sixth
+          - name: SourceCodeOutput
+        runOrder: 1
 
-  # Deploy model stage: Deploys the registered model to a SageMaker endpoint
+  # Stage 7: Deploy model to a SageMaker endpoint
   - name: DeployModelEndpoint
+    description: 'Deploy the model to a SageMaker endpoint'
     actions:
       - name: DeployToEndpoint
         actionTypeId:
-          category: Invoke
+          category: Invoke  # Invoke Lambda to deploy the model to SageMaker endpoint
           owner: AWS
-          provider: Lambda
+          provider: Lambda  # Lambda provider
           version: "1"
         configuration:
-          FunctionName: deploy_sagemaker_model  # Lambda function to deploy the model to an endpoint
+          FunctionName: deploy_sagemaker_model  # Lambda function to deploy model to endpoint
         inputArtifacts:
-          - name: SourceCodeOutput  # The source code for model deployment
-        runOrder: 1  # Run this action seventh
+          - name: SourceCodeOutput
+        runOrder: 1
 
-  # Retraining Trigger: Listens for new data in S3 and triggers retraining
+  # Stage 8: Trigger retraining when new data is added to S3
   - name: RetrainModelOnNewData
+    description: 'Trigger retraining when new data is added to S3'
     actions:
       - name: TriggerRetraining
         actionTypeId:
-          category: Invoke
+          category: Invoke  # Invoke Lambda to retrain the model
           owner: AWS
-          provider: Lambda
+          provider: Lambda  # Lambda provider
           version: "1"
         configuration:
-          FunctionName: retrain_model_on_new_data  # Lambda function to retrain the model when new data arrives
-        runOrder: 1  # Run this action last
+          FunctionName: retrain_model_on_new_data  # Lambda function to retrain the model on new data
+        runOrder: 1
 
+# EventBridge integration to trigger Lambda when a new image is pushed to ECR
+eventbridge:
+  rules:
+    - name: ECRImagePushRule
+      eventPattern:
+        source:
+          - aws.ecr  # Listen for ECR events
+        detail-type:
+          - ECR Image Push  # Event type for image push
+        resources:
+          - arn:aws:ecr:<region>:<account-id>:repository/mlops-pipeline-repo  # ECR repository ARN
+      targets:
+        - arn: arn:aws:lambda:<region>:<account-id>:function:trigger_model_training  # Lambda function to trigger model training
+          id: "StartSageMakerTraining"  # Target Lambda function for model training
+      state: ENABLED  # Enable the EventBridge rule
+
+# Lambda Functions used in the pipeline
+lambdaFunctions:
+  - name: trigger_model_training
+    description: 'Lambda function to trigger SageMaker model training'
+    handler: 'trigger_model_training.lambda_handler'  # Lambda handler function
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::<account-id>:role/SageMakerRole'  # IAM role for Lambda execution
+    timeout: 300  # Timeout for Lambda execution (5 minutes)
+    memorySize: 512  # Memory allocated for Lambda function
+
+  - name: evaluate_model_function
+    description: 'Lambda function to evaluate the trained model'
+    handler: 'evaluate_model_function.lambda_handler'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::<account-id>:role/SageMakerRole'
+    timeout: 300
+    memorySize: 512
+
+  - name: register_model_in_registry
+    description: 'Lambda function to register model in SageMaker registry'
+    handler: 'register_model_in_registry.lambda_handler'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::<account-id>:role/SageMakerRole'
+    timeout: 300
+    memorySize: 512
+
+  - name: deploy_sagemaker_model
+    description: 'Lambda function to deploy model to SageMaker endpoint'
+    handler: 'deploy_sagemaker_model.lambda_handler'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::<account-id>:role/SageMakerRole'
+    timeout: 300
+    memorySize: 512
+
+  - name: retrain_model_on_new_data
+    description: 'Lambda function to trigger retraining on new S3 data'
+    handler: 'retrain_model_on_new_data.lambda_handler'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::<account-id>:role/SageMakerRole'
+    timeout: 300
+    memorySize: 512
