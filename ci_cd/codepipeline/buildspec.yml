@@ -1,1 +1,40 @@
 
+version: 0.2
+
+env:
+  variables:
+    # Set the ECR repository URI
+    ECR_REPO_URI: <your-ecr-repo-uri>  # Replace with your actual ECR repository URI
+    IMAGE_TAG: latest  # You can replace this with a dynamic tag if needed
+    AWS_REGION: <your-region>  # Replace with your AWS region (e.g., us-east-1)
+    SAGEMAKER_ROLE_ARN: <sagemaker-role-arn>  # ARN of the IAM role for SageMaker
+    SAGEMAKER_BUCKET: <s3-bucket-name>  # Replace with your S3 bucket for model data
+
+phases:
+  install:
+    commands:
+      - echo Installing dependencies...
+      - apt-get update -y
+      - apt-get install -y awscli docker
+
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email --region $AWS_REGION)
+
+  build:
+    commands:
+      - echo Building the Docker image...
+      - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+      - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo Pushing the Docker image to ECR...
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - echo Image pushed to ECR: $ECR_REPO_URI:$IMAGE_TAG
+
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: yes
