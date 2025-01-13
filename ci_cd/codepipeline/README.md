@@ -101,6 +101,29 @@ The following Lambda functions are part of the pipeline:
 - **deploy_sagemaker_model**: Deploys the model to a SageMaker endpoint.
 - **retrain_model_on_new_data**: Retrains the model when new data is added to S3.
 
+### Detailed Lambda Functions Implementation
+
+1. **trigger_model_training**: 
+   - Fetches the Docker image from Amazon ECR and starts a SageMaker training job using the image.
+   - The Lambda function is triggered by an EventBridge event when a new image is pushed to ECR.
+
+2. **evaluate_model_function**:
+   - Evaluates the model performance based on predefined metrics.
+   - Example evaluation criteria include accuracy, F1 score, or loss.
+   - If the model passes evaluation, it triggers the next step in the pipeline (model registration).
+
+3. **register_model_in_registry**:
+   - Registers the model in SageMaker Model Registry if the evaluation metrics are satisfactory.
+   - This allows version control for the model and future model rollbacks.
+
+4. **deploy_sagemaker_model**:
+   - Deploys the registered model to a SageMaker endpoint for real-time predictions.
+   - The Lambda function sets up the necessary endpoint configuration and deploys the model.
+
+5. **retrain_model_on_new_data**:
+   - Monitors S3 for new data uploads.
+   - When new data is detected, it triggers a model retraining process by invoking a SageMaker training job using the new data.
+
 ## IAM Roles
 
 - The Lambda functions require specific IAM roles with appropriate permissions to interact with services like **SageMaker**, **ECR**, and **S3**. Ensure that the Lambda functions are assigned IAM roles with sufficient permissions to perform their tasks.
