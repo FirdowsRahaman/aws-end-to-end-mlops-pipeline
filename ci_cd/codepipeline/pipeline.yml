@@ -1,1 +1,125 @@
+stages:
+  # Source stage: Fetches the latest code from GitHub
+  - name: Source
+    actions:
+      - name: GitHubSource
+        actionTypeId:
+          category: Source
+          owner: ThirdParty
+          provider: GitHub
+          version: "1"
+        configuration:
+          Owner: <Your-GitHub-Username>  # Replace with your GitHub username
+          Repo: <Your-Repository-Name>   # Replace with your GitHub repository name
+          Branch: main  # The branch to track
+          OAuthToken: <GitHub-Access-Token>  # Your GitHub OAuth token
+        outputArtifacts:
+          - name: SourceCodeOutput  # Output artifact containing the source code
+        runOrder: 1  # Run this action first
+
+  # Build stage: Builds the Docker image from the source code
+  - name: Build
+    actions:
+      - name: BuildDockerImage
+        actionTypeId:
+          category: Build
+          owner: AWS
+          provider: CodeBuild
+          version: "1"
+        inputArtifacts:
+          - name: SourceCodeOutput  # The source code from the Source stage
+        configuration:
+          ProjectName: mlops-docker-build  # The CodeBuild project to build the Docker image
+        outputArtifacts:
+          - name: DockerImageOutput  # Output artifact containing the Docker image
+        runOrder: 1  # Run this action second
+
+  # Deploy stage: Pushes the built Docker image to ECR
+  - name: DeployToECR
+    actions:
+      - name: PushDockerImageToECR
+        actionTypeId:
+          category: Deploy
+          owner: AWS
+          provider: CodeDeployToECR
+          version: "1"
+        inputArtifacts:
+          - name: DockerImageOutput  # The Docker image to be pushed to ECR
+        configuration:
+          RepositoryName: mlops-pipeline-repo  # The ECR repository name
+          ImageTag: latest  # The tag for the Docker image
+        runOrder: 1  # Run this action third
+
+  # EventBridge for SageMaker Job Completion: EventBridge triggers the model evaluation after SageMaker job completion
+  - name: SageMakerEventBridgeRule
+    actions:
+      - name: EventBridgeTrigger
+        actionTypeId:
+          category: Invoke
+          owner: AWS
+          provider: Lambda
+          version: "1"
+        configuration:
+          FunctionName: evaluate_and_deploy  # Lambda function triggered after SageMaker completion
+        inputArtifacts:
+          - name: SourceCodeOutput  # The input source code artifact for the evaluation
+        runOrder: 1  # Run this action fourth
+
+  # EvaluateModel stage: Executes Lambda to evaluate the model after training
+  - name: EvaluateModel
+    actions:
+      - name: ModelEvaluationLambda
+        actionTypeId:
+          category: Invoke
+          owner: AWS
+          provider: Lambda
+          version: "1"
+        configuration:
+          FunctionName: evaluate_model_function  # Lambda function to evaluate the model
+        inputArtifacts:
+          - name: SourceCodeOutput  # The source code used for evaluation
+        runOrder: 1  # Run this action fifth
+
+  # Register model stage: Registers the evaluated model in the model registry
+  - name: RegisterModel
+    actions:
+      - name: RegisterModelInRegistry
+        actionTypeId:
+          category: Invoke
+          owner: AWS
+          provider: Lambda
+          version: "1"
+        configuration:
+          FunctionName: register_model_in_registry  # Lambda function to register the model
+        inputArtifacts:
+          - name: SourceCodeOutput  # The source code that contains the model details
+        runOrder: 1  # Run this action sixth
+
+  # Deploy model stage: Deploys the registered model to a SageMaker endpoint
+  - name: DeployModelEndpoint
+    actions:
+      - name: DeployToEndpoint
+        actionTypeId:
+          category: Invoke
+          owner: AWS
+          provider: Lambda
+          version: "1"
+        configuration:
+          FunctionName: deploy_sagemaker_model  # Lambda function to deploy the model to an endpoint
+        inputArtifacts:
+          - name: SourceCodeOutput  # The source code for model deployment
+        runOrder: 1  # Run this action seventh
+
+  # Retraining Trigger: Listens for new data in S3 and triggers retraining
+  - name: RetrainModelOnNewData
+    actions:
+      - name: TriggerRetraining
+        actionTypeId:
+          category: Invoke
+          owner: AWS
+          provider: Lambda
+          version: "1"
+        configuration:
+          FunctionName: retrain_model_on_new_data  # Lambda function to retrain the model when new data arrives
+        runOrder: 1  # Run this action last
 
