@@ -29,6 +29,8 @@ aws-end-to-end-mlops-pipeline/
 ├── config/               # Configuration files
 │   ├── aws/              # AWS-specific configurations (e.g., IAM, S3 paths)
 │   ├── hyperparameters/  # Hyperparameter configuration files
+|   └── config.yaml       # Configuration file with all necessary variables like S3.
+├── infra/
 │   └── pipeline.yaml     # Main pipeline configuration
 │
 ├── data/                 # Raw and processed data
