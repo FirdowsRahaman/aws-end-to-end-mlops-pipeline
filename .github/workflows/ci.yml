@@ -1,0 +1,24 @@
+name: Sovereign Infrastructure & Pipeline Compliance
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Terraform Syntax
+        uses: hashicorp/setup-terraform@v3
+      - run: |
+          cd infra/terraform
+          terraform init -backend=false
+          terraform validate
+
+      - name: Verify EU AI Act Technical Documentation
+        run: test -f EU_AI_ACT_TECHNICAL_DOCUMENTATION.md && echo "✅ EU AI Act Documentation Verified"

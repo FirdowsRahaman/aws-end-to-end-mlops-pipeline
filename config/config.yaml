@@ -1,8 +1,14 @@
 # General Configuration
 project_name: "MLOps_Project"
-region: "us-west-2"
+region: "eu-central-1"  # Frankfurt, Germany (EU Sovereign Data Residency Default)
+secondary_region: "eu-west-1"  # Dublin, Ireland (EFTA/EEA Failover)
 stack_name: "mlops-stack"
 account_id: "123456789012"  # AWS account ID
+compliance:
+  framework: "EU_AI_ACT_HIGH_RISK"
+  data_residency: "EUROPEAN_ECONOMIC_AREA"
+  schrems_ii_compliant: true
+  green_computing_tracking: true
 
 
 # Experiment Configuration

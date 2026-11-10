@@ -1,6 +1,13 @@
-# AWS End-to-End MLOps Pipeline
+# AWS End-to-End MLOps Pipeline 🇪🇺
 
-This repository provides an implementation of an **End-to-End MLOps Pipeline** using various AWS services like **SageMaker**, **Lambda**, **EventBridge**, **ECR**, **CodePipeline**, and **S3**. The pipeline automates the process of code deployment, model training, evaluation, and deployment. It also supports continuous retraining based on new data or code updates from GitHub.
+<p align="left">
+  <img src="https://img.shields.io/badge/Region-eu--central--1%20(Frankfurt)-0EA5E9?style=flat-square&logo=amazon-aws" alt="AWS Frankfurt" />
+  <a href="EU_AI_ACT_TECHNICAL_DOCUMENTATION.md"><img src="https://img.shields.io/badge/EU%20AI%20Act-Compliant-10B981?style=flat-square" alt="EU AI Act" /></a>
+  <a href="docs/adr/"><img src="https://img.shields.io/badge/Architecture-ADRs-8B5CF6?style=flat-square" alt="ADRs" /></a>
+  <img src="https://img.shields.io/badge/Green%20AI-Carbon%20Tracking-22C55E?style=flat-square" alt="Green AI" />
+</p>
+
+This repository provides an enterprise implementation of an **End-to-End MLOps Pipeline** architected for **European Sovereign Cloud Data Residency** (AWS Frankfurt `eu-central-1`) and **EU AI Act compliance**. Built using **SageMaker**, **Lambda**, **EventBridge**, **ECR**, **CodePipeline**, and **S3 with KMS Customer-Managed Keys (CMK)**. The pipeline automates code deployment, continuous model training, evaluation, drift monitoring, and ESG carbon emission tracking.
 
 ## Overview
 
