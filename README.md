@@ -1,4 +1,4 @@
-# AWS End-to-End MLOps Pipeline 🇪🇺
+# AWS End-to-End MLOps Pipeline 
 
 <p align="left">
   <img src="https://img.shields.io/badge/Region-eu--central--1%20(Frankfurt)-0EA5E9?style=flat-square&logo=amazon-aws" alt="AWS Frankfurt" />

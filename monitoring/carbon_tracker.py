@@ -1,5 +1,4 @@
-"""
-Green AI & Carbon Footprint Telemetry Tracker
+"""Green AI & Carbon Footprint Telemetry Tracker
 Implements energy consumption estimation and CO2e emission reporting for 
 European ESG / Green Computing regulatory compliance (GHG Protocol Scope 2).
 """
@@ -20,8 +19,7 @@ EUROPEAN_GRID_INTENSITY = {
 }
 
 class GreenAITracker:
-    """
-    Lightweight energy and carbon emissions telemetry tracker for SageMaker training runs.
+    """Lightweight energy and carbon emissions telemetry tracker for SageMaker training runs.
     Estimates kilowatt-hours (kWh) and kilograms of CO2 equivalent (kg CO2eq).
     """
     def __init__(self, region: str = "eu-central-1", hardware_tdp_watts: float = 300.0):
@@ -33,11 +31,10 @@ class GreenAITracker:
     def start_tracking(self):
         """Marks the start of training or batch inference epoch."""
         self.start_time = time.time()
-        print(f"🌱 [Green AI] Tracking initiated in region '{self.region}' (Grid Intensity: {self.grid_intensity} gCO2/kWh)")
+        print(f"[Green AI] Tracking initiated in region '{self.region}' (Grid Intensity: {self.grid_intensity} gCO2/kWh)")
 
     def stop_tracking(self, average_gpu_utilization: float = 0.85) -> Dict[str, Any]:
-        """
-        Calculates energy used and carbon emitted during execution.
+        """Calculates energy used and carbon emitted during execution.
         """
         if self.start_time is None:
             raise ValueError("start_tracking() must be called before stop_tracking()")
@@ -63,7 +60,7 @@ class GreenAITracker:
             "compliance_status": "CERTIFIED_EUROPEAN_GREEN_AI"
         }
 
-        print(f"🌱 [Green AI Report] Energy: {report['energy_consumed_kwh']} kWh | Emissions: {report['co2_emitted_kg']} kg CO2eq")
+        print(f"[Green AI Report] Energy: {report['energy_consumed_kwh']} kWh | Emissions: {report['co2_emitted_kg']} kg CO2eq")
         return report
 
 if __name__ == "__main__":
